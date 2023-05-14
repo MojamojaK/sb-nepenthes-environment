@@ -1,0 +1,31 @@
+[project]
+name = "nepenthes"
+version = "0.1.0"
+description = "Nepenthes environment controller for SwitchBot BLE devices on Raspberry Pi"
+requires-python = ">=3.9"
+dependencies = [
+    "awsiotsdk",
+    "bluepy; sys_platform == 'linux'",
+    "pexpect",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-cov",
+]
+
+[tool.pytest.ini_options]
+addopts = "--cov=config --cov=drivers --cov=evaluators --cov=executors --cov=helpers --cov-report=term-missing"
+
+[tool.coverage.run]
+omit = [
+    "tests/*",
+    "nepenthes_cdk/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "if __name__",
+    "pragma: no cover",
+]
