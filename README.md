@@ -81,6 +81,40 @@ PATH=/home/<YOUR_USERNAME>/.local/bin:/usr/local/bin:/usr/bin:/bin
 - **healthcheck** runs every minute — starts nepenthes if it's not running, reboots if heartbeat is stale
 - **auto_update** runs every 30 minutes — pulls from `origin/main` and reboots if there are changes
 
+## Related Repository: [nepenthes-cdk](https://github.com/MojamojaK/nepenthes-cdk)
+
+This repo is the **device-side application** that runs on a Raspberry Pi Zero W. It has a companion repo, [`nepenthes-cdk`](https://github.com/MojamojaK/nepenthes-cdk), which contains the **cloud-side infrastructure** deployed via AWS CDK. Together they form the full Nepenthes monitoring and control system.
+
+### How they connect
+
+```
+┌─────────────────────────────────┐          ┌──────────────────────────────────────┐
+│   Raspberry Pi  (this repo)     │          │   AWS Cloud  (nepenthes-cdk)         │
+│                                 │          │                                      │
+│  BLE scan ─► evaluate ─► toggle │  MQTT    │  IoT Core ─► Lambda (log puller)     │
+│         │                       │ ──────►  │       │                               │
+│         └─► log_push ───────────│──────────│───────┘  ─► CloudWatch metrics       │
+│                                 │          │          ─► CloudWatch alarms         │
+│  healthcheck (cron, 1 min)      │          │          ─► SNS ─► Pushover / email   │
+│  auto_update  (cron, 30 min)    │          │                                      │
+│                                 │          │  EventBridge (2 min) ─► Lambda        │
+│                                 │          │    └─► SwitchBot API plug status      │
+│                                 │          │                                      │
+│                                 │          │  CloudWatch alarm ─► Lambda           │
+│                                 │          │    └─► SwitchBot API: power on Pi     │
+└─────────────────────────────────┘          └──────────────────────────────────────┘
+```
+
+### Integration points
+
+| Touchpoint | This repo (device) | nepenthes-cdk (cloud) |
+|---|---|---|
+| **MQTT telemetry** | `executors/log_push.py` publishes device state JSON to AWS IoT Core via MQTT (topic configured by `MQTT_TOPIC`) | IoT topic rule on `log/nepenthes/nhome` triggers the `nepenthes_log_puller` Lambda, which extracts metrics and pushes them to CloudWatch |
+| **Heartbeat** | `evaluators/heartbeat.py` decides whether all devices are healthy; `executors/heartbeat.py` writes a local heartbeat file; the heartbeat flag is included in the MQTT payload | Cloud-side CloudWatch alarm on the Heartbeat metric fires if no heartbeat is received, triggering the `nepenthes_pi_plug_on` Lambda to power-cycle the Pi via SwitchBot API |
+| **SwitchBot API credentials** | `SB_TOKEN` / `SB_SECRET_KEY` used to discover device MAC addresses and toggle plugs via BLE + HTTP API | Same credentials used by `nepenthes_online_plug_status` and `nepenthes_pi_plug_on` Lambdas to check plug power and power-cycle the Pi remotely |
+| **Device naming** | Device aliases like `N. Meter 1`, `N. Meter 2`, `N. Peltier Upper`, etc. are defined in `config/desired_states.py` and `config/device_aliases.py` | The same device names appear in `lib/constants.ts` as CloudWatch metric dimensions and alarm targets |
+| **Monitoring & alerting** | Reads sensors and controls plugs locally; pushes raw state to the cloud | Processes telemetry into CloudWatch metrics/alarms for temperature, humidity, battery, and plug power; sends alerts via Pushover and email through SNS |
+
 ## Development
 
 ### Testing
