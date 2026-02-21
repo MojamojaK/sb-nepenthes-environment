@@ -4,8 +4,8 @@ from config.desired_states import (
     desired_temperature, desired_min_humidity,
     time_in_range, get_between_time, to_second_stamp, stamp_diff,
     desired_temperature_map, PLUG_TASK_PRIORITY, PLUG_DEFAULT_DESIRED_STATES,
-    cooler_active_diff_thresholds, heater_active_diff_thresholds,
-    ext_fan_diff_thresholds,
+    COOLER_PRIMARY_THRESHOLD, COOLER_SECONDARY_THRESHOLD,
+    heater_active_diff_thresholds, ext_fan_diff_thresholds,
 )
 from config.device_aliases import (
     cooler_aliases, heater_aliases, extfan_aliases,
@@ -126,9 +126,12 @@ class TestPlugConstants:
         for alias in PLUG_TASK_PRIORITY:
             assert alias in PLUG_DEFAULT_DESIRED_STATES
 
+    def test_cooler_thresholds_ordered(self):
+        # Secondary threshold must be strictly lower than primary threshold so
+        # staged cooling makes sense.
+        assert COOLER_SECONDARY_THRESHOLD < COOLER_PRIMARY_THRESHOLD
+
     def test_threshold_dicts_match_aliases(self):
-        for alias in cooler_aliases:
-            assert alias in cooler_active_diff_thresholds
         for alias in heater_aliases:
             assert alias in heater_active_diff_thresholds
         for alias in extfan_aliases:
