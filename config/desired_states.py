@@ -28,10 +28,11 @@ desired_temperature_map = {
         ], key=lambda x: x[0]),
 }
 
-cooler_active_diff_thresholds = {
-    "N. Peltier Upper": -0.5,
-    "N. Peltier Lower": 0.0,
-}
+# Shared thresholds for staged cooling.  Both coolers use the same levels so
+# that neither is systematically preferred.  The evaluator alternates which
+# cooler is "primary" (activated first) each session to balance wear.
+COOLER_PRIMARY_THRESHOLD = 0.0   # Activate the primary cooler
+COOLER_SECONDARY_THRESHOLD = -0.5  # Activate both coolers
 
 heater_active_diff_thresholds = {
     "N. UV": 0.8,

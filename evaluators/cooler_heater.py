@@ -7,10 +7,40 @@ from config.device_aliases import air_meter_aliases, cooler_aliases, pump_alias,
 from helpers.extract_data import extract_humidities, extract_temperatures, extract_pump_switch_state,\
     extract_pump_element_switch_states, extract_current_humidity
 from config.desired_states import desired_temperature, desired_min_humidity,\
-    desired_temperature_map, cooler_active_diff_thresholds, heater_active_diff_thresholds,\
-    ext_fan_diff_thresholds
+    desired_temperature_map, COOLER_PRIMARY_THRESHOLD, COOLER_SECONDARY_THRESHOLD,\
+    heater_active_diff_thresholds, ext_fan_diff_thresholds
+from helpers.cooler_balance import get_primary_cooler, rotate_primary_cooler, DEFAULT_STATE_PATH
 
 logger = logging.getLogger(__name__)
+
+
+def get_balanced_cooler_desired_state(
+    max_diff_temp: float,
+    current_switch_states: dict,
+    state_path: str = DEFAULT_STATE_PATH,
+) -> dict:
+    """Return desired on/off state for each cooler, alternating the primary cooler.
+
+    When light cooling is needed (diff within the primary threshold) only the
+    current primary cooler activates.  When heavy cooling is needed (diff at or
+    below the secondary threshold) both activate.  Each time a cooling session
+    ends the primary role passes to the other cooler, balancing wear.
+    """
+    was_cooling = any(current_switch_states.get(alias, False) for alias in cooler_aliases)
+
+    if max_diff_temp > COOLER_PRIMARY_THRESHOLD:
+        desired = {alias: False for alias in cooler_aliases}
+    elif max_diff_temp <= COOLER_SECONDARY_THRESHOLD:
+        desired = {alias: True for alias in cooler_aliases}
+    else:
+        primary = get_primary_cooler(state_path)
+        desired = {alias: alias == primary for alias in cooler_aliases}
+
+    is_cooling = any(desired.values())
+    if was_cooling and not is_cooling:
+        rotate_primary_cooler(state_path)
+
+    return desired
 
 
 def uv_time_based_on(alias: str, current_datetime: datetime.datetime):
@@ -68,7 +98,7 @@ def evaluate_desired_cooler_states(current_datetime: datetime.datetime, data):
     max_diff_temp = pre_max_diff_temp - (1.0 if ext_fan_is_on else 0.0)
 
     # Decide pump-safe Cooler and Heater state
-    cooler_prime_desired_state = { alias: max_diff_temp <= cooler_active_diff_thresholds[alias] for alias in cooler_aliases}
+    cooler_prime_desired_state = get_balanced_cooler_desired_state(max_diff_temp, pump_element_switch_states)
     heater_prime_desired_state = { alias: max_diff_temp >= heater_active_diff_thresholds[alias] or uv_time_based_on(alias, current_datetime) for alias in heater_aliases}
 
     # Override Disable Heater when Ext Fan is on
