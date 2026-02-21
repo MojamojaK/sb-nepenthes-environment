@@ -10,6 +10,7 @@ from config.desired_states import desired_temperature, desired_min_humidity,\
     desired_temperature_map, COOLER_PRIMARY_THRESHOLD, COOLER_SECONDARY_THRESHOLD,\
     heater_active_diff_thresholds, ext_fan_diff_thresholds
 from helpers.cooler_balance import get_primary_cooler, rotate_primary_cooler, DEFAULT_STATE_PATH
+from helpers.cooler_frozen import check_cooler_frozen
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +81,29 @@ def evaluate_desired_cooler_states(current_datetime: datetime.datetime, data):
     pre_max_diff_temp = min(list(air_meter_desired_diffs.values())) # Positive = should warm, Negative = should cool
     logger.debug("Temperatures: %s, desired_diffs: %s, pre_max_diff_temp: %.1f", temperatures, air_meter_desired_diffs, pre_max_diff_temp)
 
+    # Detect cooler frozen condition
+    coolers_active = any(pump_element_switch_states.get(alias, False) for alias in cooler_aliases)
+    frozen_paused = check_cooler_frozen(current_datetime, coolers_active, max_temperature)
+
+    if frozen_paused:
+        desired_humidity = desired_min_humidity(current_datetime)
+        plug_desired_state = {alias: False for alias in cooler_aliases + heater_aliases + extfan_aliases}
+        plug_desired_state[pump_alias] = False
+        logger.warning("Cooler frozen: all thermal systems paused for thawing")
+        return {
+            "cooler_frozen": True,
+            "meters": {
+                "v0": { alias: {"Desired": {
+                    "Temperature": air_meter_desired[alias],
+                    "Humidity": desired_humidity,
+                    "TemperatureDiff": air_meter_desired_diffs[alias],
+                } } for alias in air_meter_desired_diffs.keys() }
+            },
+            "plugs": {
+                "v0": { alias: {"Desired": { "Switch": desired_state } } for alias, desired_state in plug_desired_state.items() }
+            }
+        }
+
     # Get Meter Humidity Max Diff
     humidities = extract_humidities(data)
     current_humidity = extract_current_humidity(humidities)
@@ -115,8 +139,9 @@ def evaluate_desired_cooler_states(current_datetime: datetime.datetime, data):
     plug_desired_state = {**elements_plug_desired_state, **pump_plug_desired_state, **extfan_desired_state}
     logger.debug("Pump desired: %s, all plug desired: %s", desired_pump_switch_state, plug_desired_state)
     return {
+        "cooler_frozen": False,
         "meters": {
-            "v0": { alias: {"Desired": { 
+            "v0": { alias: {"Desired": {
                 "Temperature": air_meter_desired[alias],
                 "Humidity": desired_humidity,
                 "TemperatureDiff": air_meter_desired_diffs[alias],
