@@ -9,12 +9,23 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_STATE_PATH = os.path.join("data", "cooler_frozen_state.json")
 
-# How long coolers must be continuously active with no temperature drop
-# before declaring a freeze condition (minutes).
-FROZEN_DETECTION_MINUTES = 20
+# Detection window per number of active coolers (minutes).
+# More coolers → faster expected cooling → shorter detection window.
+FROZEN_DETECTION_MINUTES = {
+    1: 40,
+    2: 20,
+}
 
 # How long to pause all thermal systems to allow coolant to thaw (minutes).
 FROZEN_THAW_MINUTES = 90
+
+
+def _detection_minutes(active_cooler_count: int) -> int:
+    """Return the freeze-detection window for the given number of active coolers."""
+    return FROZEN_DETECTION_MINUTES.get(
+        active_cooler_count,
+        FROZEN_DETECTION_MINUTES[max(FROZEN_DETECTION_MINUTES)],
+    )
 
 
 def _load_state(state_path: str) -> dict:
@@ -38,16 +49,17 @@ def _save_state(state_path: str, state: dict) -> None:
 
 def check_cooler_frozen(
     current_datetime: datetime.datetime,
-    coolers_active: bool,
+    active_cooler_count: int,
     current_temperature: float,
     state_path: str = DEFAULT_STATE_PATH,
 ) -> bool:
     """Detect cooler freeze and manage the thaw pause cycle.
 
     Tracks temperature while coolers are running.  If temperature has not
-    dropped after ``FROZEN_DETECTION_MINUTES`` of continuous cooling the
-    coolant is assumed frozen and a thaw pause of ``FROZEN_THAW_MINUTES``
-    begins during which all thermal systems should be disabled.
+    dropped after a detection window (which varies with the number of active
+    coolers) the coolant is assumed frozen and a thaw pause of
+    ``FROZEN_THAW_MINUTES`` begins during which all thermal systems should
+    be disabled.
 
     Returns ``True`` when the system should be in a freeze-thaw pause
     (all thermal outputs off), ``False`` for normal operation.
@@ -71,7 +83,7 @@ def check_cooler_frozen(
         _save_state(state_path, state)
 
     # --- Not in pause – track cooling effectiveness ---
-    if not coolers_active:
+    if active_cooler_count == 0:
         # Cooling stopped, reset any tracking
         if state.get("cooling_started_at") is not None:
             _save_state(state_path, {})
@@ -79,17 +91,22 @@ def check_cooler_frozen(
 
     # Coolers are active – record or evaluate
     cooling_started_at = state.get("cooling_started_at")
-    if cooling_started_at is None:
-        # Cooling just started – begin tracking
+    stored_count = state.get("active_cooler_count")
+
+    if cooling_started_at is None or stored_count != active_cooler_count:
+        # Cooling just started, or the number of active coolers changed –
+        # (re-)start the detection window with the current baseline.
         state["cooling_started_at"] = current_datetime.isoformat()
         state["cooling_start_temp"] = current_temperature
+        state["active_cooler_count"] = active_cooler_count
         _save_state(state_path, state)
         return False
 
     started_dt = datetime.datetime.fromisoformat(cooling_started_at)
     elapsed = (current_datetime - started_dt).total_seconds() / 60.0
+    detection_window = _detection_minutes(active_cooler_count)
 
-    if elapsed < FROZEN_DETECTION_MINUTES:
+    if elapsed < detection_window:
         return False
 
     start_temp = state.get("cooling_start_temp", current_temperature)
@@ -97,9 +114,10 @@ def check_cooler_frozen(
     if current_temperature >= start_temp:
         # Temperature flat or rising despite active cooling – FROZEN
         logger.warning(
-            "Cooler frozen detected! Cooling active for %.1f min, "
+            "Cooler frozen detected! %d cooler(s) active for %.1f min (window %d min), "
             "start_temp=%.1f, current_temp=%.1f. Entering %d-min thaw pause.",
-            elapsed, start_temp, current_temperature, FROZEN_THAW_MINUTES,
+            active_cooler_count, elapsed, detection_window,
+            start_temp, current_temperature, FROZEN_THAW_MINUTES,
         )
         _save_state(state_path, {"frozen_at": current_datetime.isoformat()})
         return True
