@@ -1,11 +1,12 @@
 import json
 import pytest
 import datetime
+from unittest.mock import patch
 from evaluators.cooler_heater import (
     uv_time_based_on, ext_fan_state, evaluate_desired_cooler_states,
     get_balanced_cooler_desired_state,
 )
-from config.device_aliases import cooler_aliases, uv_aliases
+from config.device_aliases import cooler_aliases, heater_aliases, extfan_aliases, uv_aliases
 from config.desired_states import COOLER_PRIMARY_THRESHOLD, COOLER_SECONDARY_THRESHOLD
 
 
@@ -240,3 +241,68 @@ class TestEvaluateDesiredCoolerStates:
         heater_switch = result["plugs"]["v0"].get("N. Heater", {}).get("Desired", {}).get("Switch")
         # When ExtFan is on, heater should be disabled
         assert heater_switch is False
+
+    @patch("evaluators.cooler_heater.check_cooler_frozen", return_value=False)
+    def test_cooler_frozen_flag_false_normal(self, mock_frozen, full_data):
+        dt = datetime.datetime(2024, 1, 1, 12, 0, 0)
+        result = evaluate_desired_cooler_states(dt, full_data)
+        assert result["cooler_frozen"] is False
+
+
+class TestEvaluateDesiredCoolerStatesFrozen:
+    """Tests for the cooler-frozen override path."""
+
+    @pytest.fixture
+    def full_data(self):
+        now = datetime.datetime.now()
+        return {
+            "meters": {"v0": {
+                "N. Meter 1": {"Valid": True, "Temperature": 22.0, "Humidity": 80, "Datetime": now},
+                "N. Meter 2": {"Valid": True, "Temperature": 20.0, "Humidity": 75, "Datetime": now},
+            }},
+            "plugs": {"v0": {
+                "N. Pump": {"Valid": True, "Switch": True},
+                "N. Peltier Upper": {"Valid": True, "Switch": True},
+                "N. Peltier Lower": {"Valid": True, "Switch": False},
+                "N. UV": {"Valid": True, "Switch": False},
+                "N. Heater": {"Valid": True, "Switch": False},
+                "N. ExtFan": {"Valid": True, "Switch": False},
+            }},
+        }
+
+    @patch("evaluators.cooler_heater.check_cooler_frozen", return_value=True)
+    def test_all_thermal_plugs_off_when_frozen(self, mock_frozen, full_data):
+        dt = datetime.datetime(2024, 1, 1, 12, 0, 0)
+        result = evaluate_desired_cooler_states(dt, full_data)
+        plugs = result["plugs"]["v0"]
+        for alias in cooler_aliases + heater_aliases + extfan_aliases + ["N. Pump"]:
+            assert plugs[alias]["Desired"]["Switch"] is False, f"{alias} should be OFF"
+
+    @patch("evaluators.cooler_heater.check_cooler_frozen", return_value=True)
+    def test_cooler_frozen_flag_true(self, mock_frozen, full_data):
+        dt = datetime.datetime(2024, 1, 1, 12, 0, 0)
+        result = evaluate_desired_cooler_states(dt, full_data)
+        assert result["cooler_frozen"] is True
+
+    @patch("evaluators.cooler_heater.check_cooler_frozen", return_value=True)
+    def test_meter_desired_still_computed_when_frozen(self, mock_frozen, full_data):
+        dt = datetime.datetime(2024, 1, 1, 12, 0, 0)
+        result = evaluate_desired_cooler_states(dt, full_data)
+        for alias in result["meters"]["v0"]:
+            desired = result["meters"]["v0"][alias]["Desired"]
+            assert "Temperature" in desired
+            assert "Humidity" in desired
+            assert "TemperatureDiff" in desired
+
+    @patch("evaluators.cooler_heater.check_cooler_frozen", return_value=True)
+    def test_frozen_passes_correct_args(self, mock_frozen, full_data):
+        dt = datetime.datetime(2024, 1, 1, 12, 0, 0)
+        evaluate_desired_cooler_states(dt, full_data)
+        mock_frozen.assert_called_once()
+        args = mock_frozen.call_args
+        # First positional arg: current_datetime
+        assert args[0][0] == dt
+        # Second positional arg: coolers_active (Peltier Upper is ON in fixture)
+        assert args[0][1] is True
+        # Third positional arg: max_temperature (max of 22.0, 20.0)
+        assert args[0][2] == 22.0
