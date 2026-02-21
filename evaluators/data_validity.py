@@ -15,6 +15,8 @@ def task(data):
     current_datetime = datetime.datetime.now()
     result = {}
     for device_type, mapper in data.items():
+        if not isinstance(mapper, dict):
+            continue
         for v, entry in mapper.items():
             for alias, device_data in entry.items():
                 validity = _is_valid(current_datetime, device_data)
