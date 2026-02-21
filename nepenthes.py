@@ -16,6 +16,7 @@ from evaluators import heartbeat as evaluate_heartbeat
 from executors import desired_states as execute_desired_states
 from executors import heartbeat as execute_heartbeat
 from executors import log_push as execute_log_push
+from executors import cooler_status_publish as execute_cooler_status_publish
 
 logger = setup_logger("nepenthes", debug_minutes=5)
 data_logger = setup_data_logger("nepenthes")
@@ -40,6 +41,7 @@ def _process(data):
     data = deep_update(data, evaluate_heartbeat.task(data))
     data = deep_update(data, execute_heartbeat.task(data))
     data = deep_update(data, execute_log_push.task(data))
+    data = deep_update(data, execute_cooler_status_publish.task(data))
     return data
 
 

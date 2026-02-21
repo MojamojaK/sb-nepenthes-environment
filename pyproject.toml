@@ -6,6 +6,7 @@ requires-python = ">=3.9"
 dependencies = [
     "awsiotsdk",
     "bluepy; sys_platform == 'linux'",
+    "boto3",
     "pexpect",
 ]
 

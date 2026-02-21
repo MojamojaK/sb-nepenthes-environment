@@ -27,6 +27,9 @@ MQTT_CERT_PATH = os.environ["MQTT_CERT_PATH"]
 MQTT_KEY_PATH = os.environ["MQTT_KEY_PATH"]
 MQTT_CA_PATH = os.environ["MQTT_CA_PATH"]
 
+# AWS CloudWatch
+CLOUDWATCH_NAMESPACE = os.environ.get("CLOUDWATCH_NAMESPACE", "Nepenthes")
+
 # SwitchBot API
 SB_TOKEN = os.environ["SB_TOKEN"]
 SB_SECRET_KEY = os.environ["SB_SECRET_KEY"]
