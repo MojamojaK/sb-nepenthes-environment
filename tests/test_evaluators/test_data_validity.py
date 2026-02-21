@@ -59,3 +59,14 @@ class TestDataValidity:
         result = task(data)
         # No devices to evaluate, so result is empty
         assert result == {}
+
+    def test_skips_non_dict_top_level_values(self):
+        """Non-dict top-level values like cooler_frozen should be skipped."""
+        now = datetime.datetime.now()
+        data = {
+            "cooler_frozen": True,
+            "meters": {"v0": {"M1": {"Datetime": now}}},
+            "plugs": {"v0": {}},
+        }
+        result = task(data)
+        assert result["meters"]["v0"]["M1"]["Valid"] is True

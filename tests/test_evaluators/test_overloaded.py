@@ -33,3 +33,15 @@ class TestOverloaded:
         result = task(data)
         # No devices to evaluate, so result is empty
         assert result == {}
+
+    def test_skips_non_dict_top_level_values(self):
+        """Non-dict top-level values like cooler_frozen should be skipped."""
+        data = {
+            "cooler_frozen": True,
+            "plugs": {"v0": {
+                "P1": {"Code": "0b", "Datetime": datetime.datetime.now()},
+            }},
+            "meters": {"v0": {}},
+        }
+        result = task(data)
+        assert result["plugs"]["v0"]["P1"]["IsOverloaded"] is True
