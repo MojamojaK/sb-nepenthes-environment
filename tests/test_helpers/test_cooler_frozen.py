@@ -1,4 +1,5 @@
 import json
+import logging
 import pytest
 import datetime
 from helpers.cooler_frozen import (
@@ -260,6 +261,17 @@ class TestCheckCoolerFrozen:
         check_cooler_frozen(dt, 0, 25.0, state_path)
         import os
         assert not os.path.exists(state_path)
+
+    # --- Save state failure ---
+
+    def test_save_state_failure_logs_warning(self, state_path, caplog):
+        """When _save_state cannot write, it logs a warning and continues."""
+        bad_path = "/proc/nonexistent/cooler_frozen_state.json"
+        dt = datetime.datetime(2024, 1, 1, 12, 0, 0)
+        with caplog.at_level(logging.WARNING):
+            result = check_cooler_frozen(dt, 1, 25.0, bad_path)
+        assert result is False
+        assert "Failed to save cooler frozen state" in caplog.text
 
     # --- State file robustness ---
 
