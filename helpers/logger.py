@@ -10,7 +10,9 @@ def setup_logger(name, debug_minutes=0):
     logger = logging.getLogger(name)
     if debug_minutes > 0:
         logger.setLevel(logging.DEBUG)
-        threading.Timer(debug_minutes * 60, _raise_log_level, args=[logger]).start()
+        timer = threading.Timer(debug_minutes * 60, _raise_log_level, args=[logger])
+        timer.daemon = True
+        timer.start()
     else:
         logger.setLevel(logging.INFO)
 

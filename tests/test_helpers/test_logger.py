@@ -35,6 +35,12 @@ class TestSetupLogger:
             mock_threading.Timer.assert_called_once()
             mock_threading.Timer.return_value.start.assert_called_once()
 
+    def test_debug_timer_is_daemon(self, tmp_path):
+        with patch("helpers.logger.DATA_DIR", str(tmp_path)), \
+             patch("helpers.logger.threading") as mock_threading:
+            setup_logger("test_daemon", debug_minutes=1)
+            assert mock_threading.Timer.return_value.daemon is True
+
     def test_debug_minutes_zero_sets_info_level(self, tmp_path):
         with patch("helpers.logger.DATA_DIR", str(tmp_path)):
             logger = setup_logger("test_no_debug", debug_minutes=0)
