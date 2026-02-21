@@ -302,7 +302,14 @@ class TestEvaluateDesiredCoolerStatesFrozen:
         args = mock_frozen.call_args
         # First positional arg: current_datetime
         assert args[0][0] == dt
-        # Second positional arg: coolers_active (Peltier Upper is ON in fixture)
-        assert args[0][1] is True
+        # Second positional arg: active_cooler_count (Peltier Upper is ON in fixture)
+        assert args[0][1] == 1
         # Third positional arg: max_temperature (max of 22.0, 20.0)
         assert args[0][2] == 22.0
+
+    @patch("evaluators.cooler_heater.check_cooler_frozen", return_value=True)
+    def test_frozen_passes_dual_count(self, mock_frozen, full_data):
+        full_data["plugs"]["v0"]["N. Peltier Lower"]["Switch"] = True
+        dt = datetime.datetime(2024, 1, 1, 12, 0, 0)
+        evaluate_desired_cooler_states(dt, full_data)
+        assert mock_frozen.call_args[0][1] == 2

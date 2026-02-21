@@ -82,8 +82,8 @@ def evaluate_desired_cooler_states(current_datetime: datetime.datetime, data):
     logger.debug("Temperatures: %s, desired_diffs: %s, pre_max_diff_temp: %.1f", temperatures, air_meter_desired_diffs, pre_max_diff_temp)
 
     # Detect cooler frozen condition
-    coolers_active = any(pump_element_switch_states.get(alias, False) for alias in cooler_aliases)
-    frozen_paused = check_cooler_frozen(current_datetime, coolers_active, max_temperature)
+    active_cooler_count = sum(1 for alias in cooler_aliases if pump_element_switch_states.get(alias, False))
+    frozen_paused = check_cooler_frozen(current_datetime, active_cooler_count, max_temperature)
 
     if frozen_paused:
         desired_humidity = desired_min_humidity(current_datetime)
