@@ -88,9 +88,13 @@ def main():
         i += 1
 
 
-if __name__ == "__main__":
+def run():
     try:
         main()
     except Exception:
         logger.exception("Fatal crash")
         raise
+
+
+if __name__ == "__main__":
+    run()
