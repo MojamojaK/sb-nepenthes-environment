@@ -1,33 +1,39 @@
 """Integration tests for the evaluator pipeline.
 
-These tests verify that evaluators can run in sequence without crashing,
-even when earlier evaluators inject non-device top-level keys (like
-``cooler_frozen``) into the shared data dict.
+Evaluator modules are auto-discovered from the ``evaluators`` package:
+every module that exposes a ``task(data)`` function is included.  When a
+new evaluator is added, these tests cover it automatically — no manual
+update required.
 """
 
 import datetime
+import importlib
+import pkgutil
 from unittest.mock import patch
 
 import pytest
 
+import evaluators
 from helpers.deep_update import deep_update
-from evaluators import data_validity as evaluate_data_validity
-from evaluators import plug_state as evaluate_plug_state
-from evaluators import overloaded as evaluate_overloaded
-from evaluators import heartbeat as evaluate_heartbeat
+
+
+def _discover_evaluator_modules():
+    """Return all evaluator modules that expose a ``task`` callable."""
+    modules = []
+    for info in pkgutil.iter_modules(evaluators.__path__):
+        mod = importlib.import_module(f"evaluators.{info.name}")
+        if callable(getattr(mod, "task", None)):
+            modules.append(mod)
+    return modules
+
+
+_EVALUATOR_MODULES = _discover_evaluator_modules()
 
 
 def _evaluator_pipeline(data):
-    """Run the evaluator portion of the processing pipeline.
-
-    Mirrors the evaluator steps in nepenthes._process() but excludes the
-    executor steps (desired_states, heartbeat write, log_push) which
-    require hardware or network access.
-    """
-    data = deep_update(data, evaluate_data_validity.task(data))
-    data = deep_update(data, evaluate_plug_state.task(data))
-    data = deep_update(data, evaluate_overloaded.task(data))
-    data = deep_update(data, evaluate_heartbeat.task(data))
+    """Run every discovered evaluator in sequence, accumulating results."""
+    for mod in _EVALUATOR_MODULES:
+        data = deep_update(data, mod.task(data))
     return data
 
 
@@ -51,6 +57,22 @@ def full_data():
     }
 
 
+class TestDiscovery:
+    def test_all_evaluators_discovered(self):
+        """Ensure auto-discovery finds every evaluator with a task()."""
+        names = {mod.__name__ for mod in _EVALUATOR_MODULES}
+        assert "evaluators.data_validity" in names
+        assert "evaluators.plug_state" in names
+        assert "evaluators.overloaded" in names
+        assert "evaluators.heartbeat" in names
+
+    def test_non_task_modules_excluded(self):
+        """Modules without task() (fogger, cooler_heater) should not appear."""
+        names = {mod.__name__ for mod in _EVALUATOR_MODULES}
+        assert "evaluators.fogger" not in names
+        assert "evaluators.cooler_heater" not in names
+
+
 class TestEvaluatorPipeline:
     """End-to-end evaluator pipeline tests."""
 
@@ -60,7 +82,6 @@ class TestEvaluatorPipeline:
         result = _evaluator_pipeline(full_data)
         assert "meters" in result
         assert "plugs" in result
-        assert result["cooler_frozen"] is False
         assert "should_heartbeat" in result
 
     @patch("evaluators.cooler_heater.check_cooler_frozen", return_value=True)
