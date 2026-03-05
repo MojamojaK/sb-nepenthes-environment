@@ -16,9 +16,9 @@ FROZEN_DETECTION_MINUTES = {
     2: 30,
 }
 
-# Temperature may rise slightly even when cooling is working (sensor noise,
-# ambient fluctuations).  Only consider the coolant frozen when the current
-# temperature is at least this many °C above the start temperature.
+# Ignore small fluctuations when deciding whether the coolant is frozen.
+# The SwitchBot sensor has 0.1 °C granularity.  A tolerance of 0.5 °C
+# filters out minor noise while catching a genuine temperature rise.
 FROZEN_TEMP_TOLERANCE = 0.5
 
 # How long to pause all thermal systems to allow coolant to thaw (minutes).
