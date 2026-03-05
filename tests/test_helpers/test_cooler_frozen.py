@@ -6,6 +6,7 @@ from helpers.cooler_frozen import (
     check_cooler_frozen,
     FROZEN_DETECTION_MINUTES,
     FROZEN_THAW_MINUTES,
+    FROZEN_TEMP_TOLERANCE,
     _detection_minutes,
 )
 
@@ -81,7 +82,8 @@ class TestCheckCoolerFrozen:
 
     # --- Freeze detection (dual cooler = 20 min) ---
 
-    def test_dual_frozen_detected_when_temp_flat(self, state_path):
+    def test_dual_not_frozen_when_temp_flat(self, state_path):
+        """Flat temperature is within tolerance and should NOT trigger freeze."""
         start = datetime.datetime(2024, 1, 1, 12, 0, 0)
         self._set_state(state_path, {
             "cooling_started_at": start.isoformat(),
@@ -89,9 +91,10 @@ class TestCheckCoolerFrozen:
             "active_cooler_count": 2,
         })
         check_time = start + datetime.timedelta(minutes=FROZEN_DETECTION_MINUTES[2])
-        assert check_cooler_frozen(check_time, 2, 25.0, state_path) is True
+        assert check_cooler_frozen(check_time, 2, 25.0, state_path) is False
 
-    def test_dual_frozen_detected_when_temp_rising(self, state_path):
+    def test_dual_not_frozen_when_temp_within_tolerance(self, state_path):
+        """Small rise within tolerance should NOT trigger freeze."""
         start = datetime.datetime(2024, 1, 1, 12, 0, 0)
         self._set_state(state_path, {
             "cooling_started_at": start.isoformat(),
@@ -99,7 +102,17 @@ class TestCheckCoolerFrozen:
             "active_cooler_count": 2,
         })
         check_time = start + datetime.timedelta(minutes=FROZEN_DETECTION_MINUTES[2])
-        assert check_cooler_frozen(check_time, 2, 26.0, state_path) is True
+        assert check_cooler_frozen(check_time, 2, 25.0 + FROZEN_TEMP_TOLERANCE - 0.1, state_path) is False
+
+    def test_dual_frozen_detected_when_temp_rising_above_tolerance(self, state_path):
+        start = datetime.datetime(2024, 1, 1, 12, 0, 0)
+        self._set_state(state_path, {
+            "cooling_started_at": start.isoformat(),
+            "cooling_start_temp": 25.0,
+            "active_cooler_count": 2,
+        })
+        check_time = start + datetime.timedelta(minutes=FROZEN_DETECTION_MINUTES[2])
+        assert check_cooler_frozen(check_time, 2, 25.0 + FROZEN_TEMP_TOLERANCE, state_path) is True
 
     def test_dual_not_frozen_when_temp_dropping(self, state_path):
         start = datetime.datetime(2024, 1, 1, 12, 0, 0)
@@ -132,7 +145,7 @@ class TestCheckCoolerFrozen:
             "active_cooler_count": 1,
         })
         check_time = start + datetime.timedelta(minutes=FROZEN_DETECTION_MINUTES[1])
-        assert check_cooler_frozen(check_time, 1, 25.0, state_path) is True
+        assert check_cooler_frozen(check_time, 1, 25.0 + FROZEN_TEMP_TOLERANCE, state_path) is True
 
     def test_single_not_frozen_when_temp_dropping(self, state_path):
         start = datetime.datetime(2024, 1, 1, 12, 0, 0)
@@ -199,7 +212,7 @@ class TestCheckCoolerFrozen:
             "active_cooler_count": 2,
         })
         check_time = start + datetime.timedelta(minutes=FROZEN_DETECTION_MINUTES[2])
-        check_cooler_frozen(check_time, 2, 25.0, state_path)
+        check_cooler_frozen(check_time, 2, 25.0 + FROZEN_TEMP_TOLERANCE, state_path)
         state = self._get_state(state_path)
         assert state["frozen_at"] == check_time.isoformat()
         assert "cooling_started_at" not in state
@@ -296,9 +309,9 @@ class TestCheckCoolerFrozen:
         # Cooling starts (2 coolers)
         assert check_cooler_frozen(t0, 2, 25.0, state_path) is False
 
-        # After dual detection window, temp hasn't dropped → frozen
+        # After dual detection window, temp risen above tolerance → frozen
         t1 = t0 + datetime.timedelta(minutes=FROZEN_DETECTION_MINUTES[2])
-        assert check_cooler_frozen(t1, 2, 25.0, state_path) is True
+        assert check_cooler_frozen(t1, 2, 25.0 + FROZEN_TEMP_TOLERANCE, state_path) is True
 
         # During thaw pause → still paused
         t2 = t1 + datetime.timedelta(minutes=45)
@@ -320,11 +333,11 @@ class TestCheckCoolerFrozen:
 
         # At dual-cooler window time → should NOT detect (single cooler window is longer)
         t_mid = t0 + datetime.timedelta(minutes=FROZEN_DETECTION_MINUTES[2])
-        assert check_cooler_frozen(t_mid, 1, 25.0, state_path) is False
+        assert check_cooler_frozen(t_mid, 1, 25.0 + FROZEN_TEMP_TOLERANCE, state_path) is False
 
         # At single-cooler window → frozen
         t1 = t0 + datetime.timedelta(minutes=FROZEN_DETECTION_MINUTES[1])
-        assert check_cooler_frozen(t1, 1, 25.0, state_path) is True
+        assert check_cooler_frozen(t1, 1, 25.0 + FROZEN_TEMP_TOLERANCE, state_path) is True
 
         # After thaw period → resume
         t2 = t1 + datetime.timedelta(minutes=FROZEN_THAW_MINUTES)

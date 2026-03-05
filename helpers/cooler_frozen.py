@@ -12,9 +12,14 @@ DEFAULT_STATE_PATH = os.path.join("data", "cooler_frozen_state.json")
 # Detection window per number of active coolers (minutes).
 # More coolers → faster expected cooling → shorter detection window.
 FROZEN_DETECTION_MINUTES = {
-    1: 40,
-    2: 20,
+    1: 60,
+    2: 30,
 }
+
+# Temperature may rise slightly even when cooling is working (sensor noise,
+# ambient fluctuations).  Only consider the coolant frozen when the current
+# temperature is at least this many °C above the start temperature.
+FROZEN_TEMP_TOLERANCE = 0.5
 
 # How long to pause all thermal systems to allow coolant to thaw (minutes).
 FROZEN_THAW_MINUTES = 90
@@ -111,7 +116,7 @@ def check_cooler_frozen(
 
     start_temp = state.get("cooling_start_temp", current_temperature)
 
-    if current_temperature >= start_temp:
+    if current_temperature >= start_temp + FROZEN_TEMP_TOLERANCE:
         # Temperature flat or rising despite active cooling – FROZEN
         logger.warning(
             "Cooler frozen detected! %d cooler(s) active for %.1f min (window %d min), "
