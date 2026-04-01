@@ -31,6 +31,8 @@ desired_temperature_map = {
 # Shared thresholds for staged cooling.  Both coolers use the same levels so
 # that neither is systematically preferred.  The evaluator alternates which
 # cooler is "primary" (activated first) each session to balance wear.
+COOLER_FREEZE_DETECTION_ENABLED = False  # Temporarily disabled
+
 COOLER_PRIMARY_THRESHOLD = 0.0   # Activate the primary cooler
 COOLER_SECONDARY_THRESHOLD = -0.5  # Activate both coolers
 

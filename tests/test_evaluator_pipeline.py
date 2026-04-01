@@ -84,7 +84,7 @@ class TestEvaluatorPipeline:
         assert "plugs" in result
         assert "should_heartbeat" in result
 
-    @pytest.mark.skip(reason="Cooler freeze detection temporarily disabled")
+    @patch("evaluators.cooler_heater.COOLER_FREEZE_DETECTION_ENABLED", True)
     @patch("evaluators.cooler_heater.check_cooler_frozen", return_value=True)
     def test_pipeline_with_cooler_frozen(self, mock_frozen, full_data):
         """Pipeline completes when cooler_frozen injects a top-level bool.
@@ -98,7 +98,7 @@ class TestEvaluatorPipeline:
         assert result["cooler_frozen"] is True
         assert "should_heartbeat" in result
 
-    @pytest.mark.skip(reason="Cooler freeze detection temporarily disabled")
+    @patch("evaluators.cooler_heater.COOLER_FREEZE_DETECTION_ENABLED", True)
     @patch("evaluators.cooler_heater.check_cooler_frozen", return_value=True)
     def test_overloaded_detected_despite_frozen(self, mock_frozen, full_data):
         """Overload detection still works when cooler_frozen is present."""

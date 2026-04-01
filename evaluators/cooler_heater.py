@@ -8,7 +8,7 @@ from helpers.extract_data import extract_humidities, extract_temperatures, extra
     extract_pump_element_switch_states, extract_current_humidity
 from config.desired_states import desired_temperature, desired_min_humidity,\
     desired_temperature_map, COOLER_PRIMARY_THRESHOLD, COOLER_SECONDARY_THRESHOLD,\
-    heater_active_diff_thresholds, ext_fan_diff_thresholds
+    heater_active_diff_thresholds, ext_fan_diff_thresholds, COOLER_FREEZE_DETECTION_ENABLED
 from helpers.cooler_balance import get_primary_cooler, rotate_primary_cooler, DEFAULT_STATE_PATH
 from helpers.cooler_frozen import check_cooler_frozen
 
@@ -81,9 +81,9 @@ def evaluate_desired_cooler_states(current_datetime: datetime.datetime, data):
     pre_max_diff_temp = min(list(air_meter_desired_diffs.values())) # Positive = should warm, Negative = should cool
     logger.debug("Temperatures: %s, desired_diffs: %s, pre_max_diff_temp: %.1f", temperatures, air_meter_desired_diffs, pre_max_diff_temp)
 
-    # Detect cooler frozen condition (temporarily disabled)
+    # Detect cooler frozen condition
     active_cooler_count = sum(1 for alias in cooler_aliases if pump_element_switch_states.get(alias, False))
-    frozen_paused = False  # check_cooler_frozen(current_datetime, active_cooler_count, max_temperature)
+    frozen_paused = check_cooler_frozen(current_datetime, active_cooler_count, max_temperature) if COOLER_FREEZE_DETECTION_ENABLED else False
 
     if frozen_paused:
         desired_humidity = desired_min_humidity(current_datetime)
