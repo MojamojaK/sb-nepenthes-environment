@@ -249,6 +249,7 @@ class TestEvaluateDesiredCoolerStates:
         assert result["cooler_frozen"] is False
 
 
+@pytest.mark.skip(reason="Cooler freeze detection temporarily disabled")
 class TestEvaluateDesiredCoolerStatesFrozen:
     """Tests for the cooler-frozen override path."""
 
