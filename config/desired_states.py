@@ -3,7 +3,7 @@ from typing import Tuple
 
 
 desired_temperature_map = {
-    "N. Meter 2": sorted([
+    "N. Meter 1": sorted([
         (datetime.time( 2, 0 , 0), 12.5),
         (datetime.time( 4, 30, 0), 12.0),
         (datetime.time( 5, 0 , 0), 12.0),
@@ -17,7 +17,7 @@ desired_temperature_map = {
         (datetime.time(16, 0 , 0), 17.0),
         (datetime.time(23, 0 , 0), 13.5)
         ], key=lambda x: x[0]),
-    "N. Meter 1": sorted([
+    "N. Meter 2": sorted([
         (datetime.time( 3, 30, 0), 15.0),
         (datetime.time( 6,  0, 0), 18.0),
         (datetime.time( 9,  0, 0), 25.0),
@@ -31,7 +31,7 @@ desired_temperature_map = {
 # Shared thresholds for staged cooling.  Both coolers use the same levels so
 # that neither is systematically preferred.  The evaluator alternates which
 # cooler is "primary" (activated first) each session to balance wear.
-COOLER_FREEZE_DETECTION_ENABLED = False  # Temporarily disabled
+COOLER_FREEZE_DETECTION_ENABLED = True
 
 COOLER_PRIMARY_THRESHOLD = 0.0   # Activate the primary cooler
 COOLER_SECONDARY_THRESHOLD = -0.5  # Activate both coolers
