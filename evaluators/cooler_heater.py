@@ -117,9 +117,10 @@ def evaluate_desired_cooler_states(current_datetime: datetime.datetime, data):
     logger.debug("ExtFan desired: %s", extfan_desired_state)
 
     # When External fan is on, actual temperature is perceived lower than actual
-    # Should try to turn cooler on by lowering max_diff_temp
-    ext_fan_is_on =  any(extfan_desired_state.values())
-    max_diff_temp = pre_max_diff_temp - (1.0 if ext_fan_is_on else 0.0)
+    # Only apply offset when already in cooling territory to avoid activating
+    # coolers when temperature is at or below desired
+    ext_fan_is_on = any(extfan_desired_state.values())
+    max_diff_temp = pre_max_diff_temp - (1.0 if ext_fan_is_on and pre_max_diff_temp <= COOLER_PRIMARY_THRESHOLD else 0.0)
 
     # Decide pump-safe Cooler and Heater state
     cooler_prime_desired_state = get_balanced_cooler_desired_state(max_diff_temp, pump_element_switch_states)
