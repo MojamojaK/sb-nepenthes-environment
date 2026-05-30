@@ -5,6 +5,7 @@ import base64
 import uuid
 import json
 import logging
+import urllib.parse
 import urllib.request
 
 logger = logging.getLogger(__name__)
@@ -42,9 +43,12 @@ def _device_id_to_mac(device_id):
 
 def fetch_devices(token, secret_key):
     """Fetch device list from SwitchBot cloud API."""
+    if urllib.parse.urlparse(GET_DEVICES_ENDPOINT).scheme != "https":
+        raise ValueError("SwitchBot endpoint must use https")  # pragma: no cover
     headers = _build_headers(token, secret_key)
     req = urllib.request.Request(GET_DEVICES_ENDPOINT, headers=headers)
-    with urllib.request.urlopen(req, timeout=15) as resp:
+    # Scheme validated as https above, so file:/ and custom schemes are rejected.
+    with urllib.request.urlopen(req, timeout=15) as resp:  # nosec B310
         data = json.loads(resp.read().decode("utf-8"))
     if data.get("statusCode") != 100:
         raise RuntimeError("SwitchBot API error: {}".format(data))
