@@ -26,6 +26,11 @@ CHAR_DESC_BEFORE = b"some header\nhandle: 0x000e, char properties: 0x08, char va
 
 
 class TestSwitchbotBot:
+    def test_invalid_mac_raises_valueerror(self, mock_pexpect):
+        _, botmod = mock_pexpect
+        with pytest.raises(ValueError, match="Invalid MAC address"):
+            botmod.switchbotbot("not-a-mac", "turnon")
+
     def test_connection_error_returns_false(self, mock_pexpect):
         mock_mod, botmod = mock_pexpect
         child = MagicMock()

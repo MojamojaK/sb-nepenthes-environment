@@ -1,17 +1,23 @@
 # references
 # https://github.com/OpenWonderLabs/python-host/blob/master/switchbot.py
 
+import re
 import sys
 import logging
 import pexpect
 
 logger = logging.getLogger(__name__)
 
+_MAC_RE = re.compile(r'^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$')
+
+
 def switchbotbot(address, operation):
     '''! trigger_device brief.
     turnon, turnoff, press, down, up the SwitchBot Plug Mini
     @return : '0000':Error, '0001':Timeout
     '''
+    if not _MAC_RE.match(address):
+        raise ValueError(f"Invalid MAC address: {address}")
     logger.debug("Connecting to %s for %s", address, operation)
     con = pexpect.spawn('gatttool -b ' + address + ' -I -t random')
     con.expect(r'\[LE\]>')
