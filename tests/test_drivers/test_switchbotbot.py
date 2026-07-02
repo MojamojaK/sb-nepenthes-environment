@@ -201,8 +201,8 @@ class TestSwitchbotBot:
         child.expect.side_effect = [None, 3]  # timeout quickly
 
         botmod.switchbotbot("AA:BB:CC:DD:EE:FF", "turnon")
-        spawn_cmd = mock_mod.spawn.call_args[0][0]
-        assert "-t random" in spawn_cmd
+        spawn_args = mock_mod.spawn.call_args[0][1]
+        assert "-t" in spawn_args and "random" in spawn_args
 
 
 class TestSwitchbotBotMain:
