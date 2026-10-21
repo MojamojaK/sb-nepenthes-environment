@@ -113,10 +113,28 @@ class TestEvaluatorPipeline:
         assert result["should_heartbeat"] is True
 
     @patch("evaluators.cooler_heater.check_cooler_frozen", return_value=False)
-    def test_stale_device_blocks_heartbeat(self, mock_frozen, full_data):
-        """A stale device should block the heartbeat."""
+    def test_one_stale_meter_falls_back(self, mock_frozen, full_data):
+        """A single stale meter falls back to the other meter and does not block the heartbeat."""
         old = datetime.datetime.now() - datetime.timedelta(minutes=20)
         full_data["meters"]["v0"]["N. Meter 1"]["Datetime"] = old
         result = _evaluator_pipeline(full_data)
         assert result["meters"]["v0"]["N. Meter 1"]["Valid"] is False
+        assert result["should_heartbeat"] is True
+
+    @patch("evaluators.cooler_heater.check_cooler_frozen", return_value=False)
+    def test_all_stale_meters_block_heartbeat(self, mock_frozen, full_data):
+        """With every meter stale, the pipeline still runs but the heartbeat is blocked."""
+        old = datetime.datetime.now() - datetime.timedelta(minutes=20)
+        for meter in full_data["meters"]["v0"].values():
+            meter["Datetime"] = old
+        result = _evaluator_pipeline(full_data)
+        assert result["should_heartbeat"] is False
+
+    @patch("evaluators.cooler_heater.check_cooler_frozen", return_value=False)
+    def test_stale_plug_blocks_heartbeat(self, mock_frozen, full_data):
+        """A stale plug should block the heartbeat."""
+        old = datetime.datetime.now() - datetime.timedelta(minutes=20)
+        full_data["plugs"]["v0"]["N. Pump"]["Datetime"] = old
+        result = _evaluator_pipeline(full_data)
+        assert result["plugs"]["v0"]["N. Pump"]["Valid"] is False
         assert result["should_heartbeat"] is False

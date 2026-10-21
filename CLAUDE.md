@@ -35,6 +35,8 @@ uv run pytest --cov-report=html
 
 See README.md for initial setup.
 
+Before changing anything, `git fetch` and compare with what the Pi runs (`ssh pi0 'cd ~/bin/nepenthes && git log --oneline -1'`). The Pi tracks `origin/main`, and a local clone can be far behind it.
+
 ### The Pi
 
 - SSH alias: `pi0` (192.168.176.15), user `kazuki_fujita`, key auth (`~/.ssh/id_ed25519`). Use `ssh -o BatchMode=yes pi0 ...` so a broken key fails fast instead of hanging on a password prompt.
