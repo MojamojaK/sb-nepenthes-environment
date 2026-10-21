@@ -13,7 +13,7 @@ import pexpect
 
 logger = logging.getLogger(__name__)
 
-_MAC_RE = re.compile(r'^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$')
+_MAC_RE = re.compile(r'([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}')
 
 
 def switchbotplugmini(address, operation):
@@ -21,10 +21,10 @@ def switchbotplugmini(address, operation):
     turnoff, turnon, toggle, readstate the SwitchBot Plug Mini
     @return : '0000':Error, '0001':Timeout, '0100':Off, '0180':On
     '''
-    if not _MAC_RE.match(address):
+    if not _MAC_RE.fullmatch(address):
         raise ValueError(f"Invalid MAC address: {address}")
     logger.debug("Connecting to %s for %s", address, operation)
-    con = pexpect.spawn('gatttool -b ' + address + ' -I') # remove "-t random" for Plug Mini
+    con = pexpect.spawn('gatttool', ['-b', address, '-I']) # remove "-t random" for Plug Mini
     con.expect(r'\[LE\]>')
     retry = 3
     index = 0
