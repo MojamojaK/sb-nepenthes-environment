@@ -108,8 +108,12 @@ def evaluate_desired_cooler_states(current_datetime: datetime.datetime, data):
     humidities = extract_humidities(data)
     current_humidity = extract_current_humidity(humidities)
     desired_humidity = desired_min_humidity(current_datetime)
-    max_diff_hum = desired_humidity - current_humidity # Positive = should fog, Negative should de-fog
-    logger.debug("Humidity: current=%.1f desired=%.1f diff=%.1f", current_humidity, desired_humidity, max_diff_hum)
+    if current_humidity is None:
+        logger.warning("Humidity unavailable, falling back to humidity diff 0")
+        max_diff_hum = 0.0 # Fallback: assume humidity is at desired, so ExtFan does not de-fog
+    else:
+        max_diff_hum = desired_humidity - current_humidity # Positive = should fog, Negative should de-fog
+        logger.debug("Humidity: current=%.1f desired=%.1f diff=%.1f", current_humidity, desired_humidity, max_diff_hum)
 
     # Decide ExtFan state
     input_value = {"Temperature": pre_max_diff_temp, "Humidity": max_diff_hum}

@@ -211,6 +211,17 @@ class TestEvaluateDesiredCoolerStates:
             }},
         }
 
+    def test_all_meters_invalid_falls_back(self, full_data):
+        """No valid meters: no crash, ExtFan only follows its time schedule."""
+        for meter in full_data["meters"]["v0"].values():
+            meter["Valid"] = False
+        dt = datetime.datetime(2024, 1, 1, 12, 0, 0)
+        result = evaluate_desired_cooler_states(dt, full_data)
+        assert result["plugs"]["v0"]["N. ExtFan"]["Desired"]["Switch"] is False
+        dt = datetime.datetime(2024, 1, 1, 15, 0, 0)  # 15:00 -> ExtFan always on
+        result = evaluate_desired_cooler_states(dt, full_data)
+        assert result["plugs"]["v0"]["N. ExtFan"]["Desired"]["Switch"] is True
+
     def test_returns_meters_and_plugs(self, full_data):
         dt = datetime.datetime(2024, 1, 1, 12, 0, 0)
         result = evaluate_desired_cooler_states(dt, full_data)
