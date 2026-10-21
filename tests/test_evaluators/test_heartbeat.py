@@ -16,10 +16,24 @@ class TestHeartbeatEvaluator:
         result = task(data)
         assert result["should_heartbeat"] is True
 
-    def test_invalid_meter_blocks_heartbeat(self):
+    def test_one_invalid_meter_falls_back(self):
+        """One invalid meter does not block, the remaining valid meters are used."""
         data = {
             "meters": {"v0": {
                 "M1": {"Valid": True},
+                "M2": {"Valid": False},
+            }},
+            "plugs": {"v0": {
+                "P1": {"Valid": True, "ToggleResult": True},
+            }},
+        }
+        result = task(data)
+        assert result["should_heartbeat"] is True
+
+    def test_all_meters_invalid_blocks_heartbeat(self):
+        data = {
+            "meters": {"v0": {
+                "M1": {"Valid": False},
                 "M2": {"Valid": False},
             }},
             "plugs": {"v0": {

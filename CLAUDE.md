@@ -101,4 +101,4 @@ To upgrade:
 
 ### Heartbeat / reboot loops
 
-The heartbeat is only written when **every** meter and plug in `data/device_config.json` is `Valid` (`evaluators/heartbeat.py`). One dead SwitchBot meter blocks the heartbeat forever, and healthcheck then reboots the Pi every ~60 minutes. To find the culprit, look at the last JSON block in `data/nepenthes_state.log` for a device with `"Valid": false` and no `Datetime`/`BatteryVoltage`. Usually it is a flat battery or a device out of BLE range.
+The heartbeat (`evaluators/heartbeat.py`) needs **every plug** to be `Valid` with a successful toggle, and **at least one meter** to be `Valid`. An invalid meter is tolerated because the cooler/heater and fogger logic fall back to the remaining valid meters (max temperature, min humidity). If the heartbeat goes stale, healthcheck reboots the Pi every ~60 minutes. To find the culprit, look at the last JSON block in `data/nepenthes_state.log` for a device with `"Valid": false` and no `Datetime`/`BatteryVoltage`. Usually it is a flat battery or a device out of BLE range.

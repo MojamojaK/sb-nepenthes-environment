@@ -6,10 +6,13 @@ def task(data):
     should_heartbeat = True
     meters = data.get("meters", {}).get("v0", {})
     plugs = data.get("plugs", {}).get("v0", {})
+    # Meters fall back to the remaining valid meters, so only block when none are valid
     for alias, meter in meters.items():
         if not meter.get("Valid", False):
-            logger.debug("Heartbeat blocked: meter %s is invalid", alias)
-        should_heartbeat = should_heartbeat and meter.get("Valid", False)
+            logger.debug("Meter %s is invalid, falling back to other meters", alias)
+    if not any(meter.get("Valid", False) for meter in meters.values()):
+        logger.debug("Heartbeat blocked: no valid meters")
+        should_heartbeat = False
     for alias, plug in plugs.items():
         if not plug.get("Valid", False):
             logger.debug("Heartbeat blocked: plug %s is invalid", alias)
