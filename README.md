@@ -74,10 +74,12 @@ crontab -e
 Add the following entries (adjust the `PATH` to include the directory where `uv` is installed):
 ```
 PATH=/home/<YOUR_USERNAME>/.local/bin:/usr/local/bin:/usr/bin:/bin
+UV_NO_DEV=1
 * * * * * cd ~/bin/nepenthes && uv run healthcheck.py
 */30 * * * * cd ~/bin/nepenthes && uv run auto_update.py
 ```
 
+- `UV_NO_DEV=1` keeps dev-only packages (pytest, etc.) off the Pi. `uv run` and the healthcheck's `uv sync` inherit it
 - **healthcheck** runs every minute — starts nepenthes if it's not running, reboots if heartbeat is stale
 - **auto_update** runs every 30 minutes — pulls from `origin/main` and reboots if there are changes
 
