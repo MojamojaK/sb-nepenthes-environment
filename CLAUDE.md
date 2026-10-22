@@ -104,3 +104,11 @@ To upgrade:
 ### Heartbeat / reboot loops
 
 The heartbeat (`evaluators/heartbeat.py`) needs **every plug** to be `Valid` with a successful toggle, and **at least one meter** to be `Valid`. An invalid meter is tolerated because the cooler/heater and fogger logic fall back to the remaining valid meters (max temperature, min humidity). If the heartbeat goes stale, healthcheck reboots the Pi every ~60 minutes. To find the culprit, look at the last JSON block in `data/nepenthes_state.log` for a device with `"Valid": false` and no `Datetime`/`BatteryVoltage`. Usually it is a flat battery or a device out of BLE range.
+
+### Security
+
+- **OS end of life:** bullseye (Debian 11) lost security support on 2026-08-31, and the Raspbian repo stopped updating 2026-09-04. `apt upgrade` will not bring new security fixes. The fix is a fresh install of a current Raspberry Pi OS, not an in-place patch.
+- **Dev dependencies stay off the Pi:** crontab sets `UV_NO_DEV=1`, so `uv run`/`uv sync` skip the dev group (pytest etc.). Dependabot alerts with `scope: development` therefore don't affect the Pi.
+- **Secrets:** `.env` and the AWS IoT key/cert in `~/.config/` should be mode 600.
+- **SSH:** key-only (`/etc/ssh/sshd_config.d/10-hardening.conf`: `PasswordAuthentication no`, `PermitRootLogin no`).
+- To audit: `uv export --frozen --all-groups --no-hashes --no-emit-project -o req.txt && uvx pip-audit -r req.txt --no-deps --disable-pip`. pip-audit evaluates environment markers for the *local* Python, so also audit the Python 3.9-only pins (e.g. pytest 8.4.2) explicitly. For code, run `uvx bandit -r . -x ./.venv,./tests,./htmlcov`.
