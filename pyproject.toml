@@ -4,6 +4,8 @@ version = "0.1.0"
 description = "Nepenthes environment controller for SwitchBot BLE devices on Raspberry Pi"
 requires-python = ">=3.9"
 dependencies = [
+    # Direct dependency only so the piwheels source below applies (awsiotsdk pins the version).
+    "awscrt",
     "awsiotsdk",
     "bluepy; sys_platform == 'linux'",
     "pexpect",
@@ -14,6 +16,17 @@ dev = [
     "pytest",
     "pytest-cov",
 ]
+
+# PyPI has no armv6l (Pi Zero) wheels for these, so take them prebuilt from piwheels there
+# instead of compiling for over an hour on the Pi.
+[[tool.uv.index]]
+name = "piwheels"
+url = "https://www.piwheels.org/simple"
+explicit = true
+
+[tool.uv.sources]
+awscrt = [{ index = "piwheels", marker = "platform_machine == 'armv6l'" }]
+bluepy = [{ index = "piwheels", marker = "platform_machine == 'armv6l'" }]
 
 [tool.pytest.ini_options]
 addopts = "--cov=config --cov=drivers --cov=evaluators --cov=executors --cov=helpers --cov-report=term-missing"
