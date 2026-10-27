@@ -40,11 +40,12 @@ Before changing anything, `git fetch` and compare with what the Pi runs (`ssh pi
 ### The Pi
 
 - SSH alias: `pi0` (192.168.176.15), user `kazuki_fujita`, key auth (`~/.ssh/id_ed25519`). Use `ssh -o BatchMode=yes pi0 ...` so a broken key fails fast instead of hanging on a password prompt.
-- Raspberry Pi Zero W: armv6l, 429 MB RAM, Raspbian 11 (bullseye), system Python 3.9. Everything is slow.
-- Passwordless sudo is available.
-- The project lives at `~/bin/nepenthes`. nepenthes runs in tmux session `nep-session` (`uv run nepenthes.py`); it is not a systemd service.
+- Raspberry Pi Zero W (Rev 1.1, not Zero 2 W): armv6l, 429 MB RAM. Hostname `nepenthes`. Raspberry Pi OS Lite 32-bit, Debian 13 (trixie), system Python 3.13. Everything is slow.
+- Installed fresh on 2026-10-27 (see "Fresh install"). The previous SD card (Raspbian 11 bullseye) is kept as a rollback.
+- Passwordless sudo is available (`/etc/sudoers.d/010-kazuki_fujita-nopasswd`).
+- The project lives at `~/bin/nepenthes`, cloned over HTTPS (the repo is public, so the Pi has no GitHub key). nepenthes runs in tmux session `nep-session` (`uv run nepenthes.py`); it is not a systemd service.
 - Cron (`crontab -l`): `healthcheck.py` every minute, `auto_update.py` every 30 minutes.
-- The "post-quantum key exchange" SSH warning is expected: bullseye ships OpenSSH 8.4. Only an OS release upgrade (bookworm+) removes it; patching does not.
+- Network: NetworkManager, static `192.168.176.15/24` set via cloud-init `network-config` on the boot partition.
 
 ### Things that reboot the Pi
 
@@ -85,30 +86,49 @@ Verify: `apt list --upgradable` is empty, `sudo apt-get check` is clean, and che
 
 ### Python dependencies
 
-- `uv` resolves from PyPI only (it ignores the piwheels entry in `/etc/pip.conf`). PyPI has no armv6l wheels for `awscrt`, so the Pi **compiles awscrt from source** whenever its version changes. That takes a long time and lots of memory.
-- `awsiotsdk` pins an exact `awscrt` version (e.g. 1.31.0 -> `awscrt==0.36.1`).
+- PyPI has no armv6l wheels for `awscrt` or `bluepy`, so `pyproject.toml` takes both from **piwheels on armv6l only** (`[tool.uv.sources]`). `awscrt` is a direct dependency only so that override applies. Without it the Pi compiles awscrt from source (75+ minutes).
+- `awsiotsdk` pins an exact `awscrt` version (e.g. 1.31.0 -> `awscrt==0.36.1`). Before upgrading, check piwheels has a wheel for the new version and the Pi's Python: `https://www.piwheels.org/project/awscrt/`.
+- piwheels' armv6l wheels are tagged `linux_armv7l` inside (built on ARMv7, runs fine on the Zero). uv sees the installed packages as mismatched and reinstalls them on every `uv run`, so cron sets `UV_NO_SYNC=1`. healthcheck still runs `uv sync` before it starts nepenthes. `uv sync --dry-run` on the Pi always shows `~ awscrt` / `~ bluepy`; that is expected.
+- `bluepy-helper` is hard-linked from the uv cache, so `setcap` survives these reinstalls.
 
 To upgrade:
 
-1. Locally: `uv lock --upgrade && uv sync && uv run pytest`.
-2. With maintenance mode on, pre-build on the Pi in a scratch copy so the live `.venv` is untouched and the built wheel lands in the shared uv cache:
-   ```
-   ssh pi0 'mkdir -p ~/nep-prebuild'
-   scp pyproject.toml uv.lock pi0:nep-prebuild/
-   ssh pi0 'cd ~/nep-prebuild && nohup sh -c "export PATH=\$HOME/.local/bin:\$PATH CMAKE_BUILD_PARALLEL_LEVEL=1; uv sync --frozen --no-dev --no-install-project; echo EXIT=\$?" </dev/null > ~/awscrt-build.log 2>&1 &'
-   ```
-   `CMAKE_BUILD_PARALLEL_LEVEL=1` avoids running out of RAM.
-3. Commit and push `uv.lock` (ask the user first). `auto_update` pulls and reboots. On restart, healthcheck runs `uv sync` (fast, from the cache) and re-applies `setcap` to `bluepy-helper`.
-4. Delete `~/nep-prebuild` and turn maintenance mode off.
+1. Locally: `uv lock --upgrade && uv sync && uv run pytest`. Check `uv.lock` lists a piwheels `linux_armv6l` wheel for the Pi's Python (cp313) for `awscrt` and `bluepy`.
+2. Optionally test on the Pi in a scratch dir (live `.venv` untouched): `scp pyproject.toml uv.lock pi0:nep-test/` then `ssh pi0 'cd nep-test && ~/.local/bin/uv sync --frozen --no-dev --no-install-project'`. It should take seconds and build nothing.
+3. Commit and push `uv.lock` (ask the user first). `auto_update` pulls and reboots. On restart, healthcheck runs `uv sync` and re-applies `setcap` to `bluepy-helper`.
 
 ### Heartbeat / reboot loops
 
 The heartbeat (`evaluators/heartbeat.py`) needs **every plug** to be `Valid` with a successful toggle, and **at least one meter** to be `Valid`. An invalid meter is tolerated because the cooler/heater and fogger logic fall back to the remaining valid meters (max temperature, min humidity). If the heartbeat goes stale, healthcheck reboots the Pi every ~60 minutes. To find the culprit, look at the last JSON block in `data/nepenthes_state.log` for a device with `"Valid": false` and no `Datetime`/`BatteryVoltage`. Usually it is a flat battery or a device out of BLE range.
 
+### Fresh install
+
+How the Pi was set up on 2026-10-27. Downtime was ~30 minutes, and nothing had to be typed on the Pi.
+
+1. **Flash** a new SD card with Raspberry Pi Imager: device "Raspberry Pi Zero", OS "Raspberry Pi OS Lite (32-bit)" (64-bit will not boot on armv6). Customisation: hostname `nepenthes`, user `kazuki_fujita`, Wi-Fi with country JP, timezone `Asia/Tokyo`, SSH public-key only with the Mac's `~/.ssh/id_ed25519.pub`.
+2. **Static IP:** with the card mounted on the Mac (`/Volumes/bootfs`), edit `network-config` so `wlan0` has `dhcp4: false`, `addresses: [192.168.176.15/24]`, `routes: [{to: default, via: 192.168.176.1}]`, `nameservers: {addresses: [192.168.176.1, 1.1.1.1]}`. Never print this file: it holds the Wi-Fi password.
+3. **Stage the setup** on the boot partition, copying secrets straight from the running Pi (no copy left on the Mac):
+   ```
+   D=/Volumes/bootfs/nepenthes-setup; mkdir -p $D/data
+   cp pi-setup/firstboot.sh $D/setup.sh
+   scp pi0:bin/nepenthes/.env pi0:.config/N_home.cert.pem pi0:.config/N_home.private.key pi0:.config/root-CA.crt $D/
+   scp pi0:bin/nepenthes/data/{device_config,cooler_balance_state,cooler_frozen_state}.json $D/data/
+   ```
+   Then append `  - [ bash, /boot/firmware/nepenthes-setup/setup.sh ]` to `runcmd:` in `user-data`, and eject.
+4. **Cut over:** `ssh pi0 sudo shutdown -h now`, swap cards, power on, and `ssh-keygen -R 192.168.176.15`. SSH comes up ~10 minutes after power-on. The setup takes ~5 more and logs to `/var/log/nepenthes-setup.log` (ends with `NEPENTHES SETUP DONE`). It deletes `nepenthes-setup/` from the boot partition when done.
+5. **Verify:** `data/heartbeat.json` updates, every device in `data/nepenthes_state.log` is `Valid`, `data/log_push.json` updates (MQTT). Then do a reboot test.
+
+`pi-setup/firstboot.sh` handles two traps from the 2026-10-27 install:
+- **Bluetooth is RF-kill soft-blocked on a fresh image.** `hciconfig hci0` shows `DOWN`, every scan fails with `scanend ... Rejected`, no device is ever valid, and healthcheck reboot-loops. Fix: `sudo rfkill unblock bluetooth` (persists across reboots).
+- **`UV_NO_SYNC=1` in cron** (see "Python dependencies").
+
+Rollback: power off and put the old card back.
+
 ### Security
 
-- **OS end of life:** bullseye (Debian 11) lost security support on 2026-08-31, and the Raspbian repo stopped updating 2026-09-04. `apt upgrade` will not bring new security fixes. The fix is a fresh install of a current Raspberry Pi OS, not an in-place patch.
+- **OS:** trixie (Debian 13) is supported. When a Debian release reaches end of life, do a fresh install (see "Fresh install") rather than an in-place release upgrade.
 - **Dev dependencies stay off the Pi:** crontab sets `UV_NO_DEV=1`, so `uv run`/`uv sync` skip the dev group (pytest etc.). Dependabot alerts with `scope: development` therefore don't affect the Pi.
 - **Secrets:** `.env` and the AWS IoT key/cert in `~/.config/` should be mode 600.
-- **SSH:** key-only (`/etc/ssh/sshd_config.d/10-hardening.conf`: `PasswordAuthentication no`, `PermitRootLogin no`).
+- **SSH:** key-only. Raspberry Pi Imager sets `ssh_pwauth: false`; root has no password or key.
+- **GitHub:** the Pi has no GitHub credentials. It pulls the public repo over HTTPS.
 - To audit: `uv export --frozen --all-groups --no-hashes --no-emit-project -o req.txt && uvx pip-audit -r req.txt --no-deps --disable-pip`. pip-audit evaluates environment markers for the *local* Python, so also audit the Python 3.9-only pins (e.g. pytest 8.4.2) explicitly. For code, run `uvx bandit -r . -x ./.venv,./tests,./htmlcov`.

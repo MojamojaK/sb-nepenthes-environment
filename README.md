@@ -75,11 +75,13 @@ Add the following entries (adjust the `PATH` to include the directory where `uv`
 ```
 PATH=/home/<YOUR_USERNAME>/.local/bin:/usr/local/bin:/usr/bin:/bin
 UV_NO_DEV=1
+UV_NO_SYNC=1
 * * * * * cd ~/bin/nepenthes && uv run healthcheck.py
 */30 * * * * cd ~/bin/nepenthes && uv run auto_update.py
 ```
 
 - `UV_NO_DEV=1` keeps dev-only packages (pytest, etc.) off the Pi. `uv run` and the healthcheck's `uv sync` inherit it
+- `UV_NO_SYNC=1` stops `uv run` from re-syncing every minute. piwheels' armv6l wheels are tagged `linux_armv7l` inside, so uv would otherwise reinstall `awscrt` and `bluepy` on every run. healthcheck still runs `uv sync` before it starts nepenthes
 - **healthcheck** runs every minute — starts nepenthes if it's not running, reboots if heartbeat is stale
 - **auto_update** runs every 30 minutes — pulls from `origin/main` and reboots if there are changes
 
