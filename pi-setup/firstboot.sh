@@ -24,6 +24,21 @@ usermod -aG bluetooth "$U"
 # Fresh images ship with Bluetooth soft-blocked; systemd-rfkill keeps the unblock across reboots
 rfkill unblock bluetooth
 
+# Keep the journal across reboots (Raspberry Pi OS defaults to RAM only), capped for the SD card
+mkdir -p /etc/systemd/journald.conf.d
+cat >/etc/systemd/journald.conf.d/50-persistent.conf <<'EOF'
+# Keep the journal across reboots (overrides 40-rpi-volatile-storage.conf) so unexpected
+# reboots can be diagnosed. Capped so it cannot fill the SD card.
+[Journal]
+Storage=persistent
+SystemMaxUse=100M
+SystemMaxFileSize=10M
+SystemKeepFree=2G
+MaxRetentionSec=1month
+SyncIntervalSec=1m
+EOF
+systemctl restart systemd-journald
+
 # AWS IoT cert/key/CA
 install -d -m 700 -o "$U" -g "$U" "$H/.config"
 install -m 600 -o "$U" -g "$U" "$S/N_home.cert.pem" "$S/N_home.private.key" "$S/root-CA.crt" "$H/.config/"

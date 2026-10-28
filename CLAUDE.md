@@ -122,7 +122,19 @@ How the Pi was set up on 2026-10-27. Downtime was ~30 minutes, and nothing had t
 - **Bluetooth is RF-kill soft-blocked on a fresh image.** `hciconfig hci0` shows `DOWN`, every scan fails with `scanend ... Rejected`, no device is ever valid, and healthcheck reboot-loops. Fix: `sudo rfkill unblock bluetooth` (persists across reboots).
 - **`UV_NO_SYNC=1` in cron** (see "Python dependencies").
 
+The script also makes the journal persistent (`/etc/systemd/journald.conf.d/50-persistent.conf`: at most 100 MB, at least 2 GB kept free, entries older than a month deleted, synced every minute). Raspberry Pi OS keeps it in RAM by default, which hides the cause of unexpected reboots.
+
 Rollback: power off and put the old card back.
+
+### Unexpected reboots
+
+healthcheck logs `Rebooting...` and auto_update logs `Rebooting after update...` before they reboot. If neither did, check:
+
+- `journalctl -b -1 -n 50`: the last messages before the reset. A log that just stops means a power cut or a hang (systemd runs the 1-minute hardware watchdog).
+- `vcgencmd get_throttled`: anything other than `0x0` means under-voltage or throttling since boot.
+- The cloud side (`nepenthes-cdk`, AWS us-west-2) power-cycles the Pi through its SwitchBot plug when the heartbeat alarm fires. Check the logs of the `NPiPlugOnLambda` function and `aws cloudwatch describe-alarm-history`.
+
+The Pi has no hardware clock. After an unclean reboot it starts from the last saved time and jumps at the NTP sync, so log timestamps from the two boots can overlap.
 
 ### Security
 
