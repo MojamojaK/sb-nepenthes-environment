@@ -2,7 +2,7 @@
 name = "nepenthes"
 version = "0.1.0"
 description = "Nepenthes environment controller for SwitchBot BLE devices on Raspberry Pi"
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 dependencies = [
     # Direct dependency only so the piwheels source below applies (awsiotsdk pins the version).
     "awscrt",

@@ -41,7 +41,7 @@ Before changing anything, `git fetch` and compare with what the Pi runs (`ssh pi
 
 - SSH alias: `pi0` (192.168.176.15), user `kazuki_fujita`, key auth (`~/.ssh/id_ed25519`). Use `ssh -o BatchMode=yes pi0 ...` so a broken key fails fast instead of hanging on a password prompt.
 - Raspberry Pi Zero W (Rev 1.1, not Zero 2 W): armv6l, 429 MB RAM. Hostname `nepenthes`. Raspberry Pi OS Lite 32-bit, Debian 13 (trixie), system Python 3.13. Everything is slow.
-- Installed fresh on 2026-10-27 (see "Fresh install"). The previous SD card (Raspbian 11 bullseye) is kept as a rollback.
+- Installed fresh on 2026-10-27 (see "Fresh install"). The previous SD card (Raspbian 11 bullseye, Python 3.9) can no longer run `main`, which requires Python 3.11+.
 - Passwordless sudo is available (`/etc/sudoers.d/010-kazuki_fujita-nopasswd`).
 - The project lives at `~/bin/nepenthes`, cloned over HTTPS (the repo is public, so the Pi has no GitHub key). nepenthes runs in tmux session `nep-session` (`uv run nepenthes.py`); it is not a systemd service.
 - Cron (`crontab -l`): `healthcheck.py` every minute, `auto_update.py` every 30 minutes.
@@ -124,7 +124,7 @@ How the Pi was set up on 2026-10-27. Downtime was ~30 minutes, and nothing had t
 
 The script also makes the journal persistent (`/etc/systemd/journald.conf.d/50-persistent.conf`: at most 100 MB, at least 2 GB kept free, entries older than a month deleted, synced every minute). Raspberry Pi OS keeps it in RAM by default, which hides the cause of unexpected reboots.
 
-Rollback: power off and put the old card back.
+Rollback: keep the old card until the new install has proven itself. It only works while `requires-python` still allows the old card's Python.
 
 ### Unexpected reboots
 
@@ -143,4 +143,4 @@ The Pi has no hardware clock. After an unclean reboot it starts from the last sa
 - **Secrets:** `.env` and the AWS IoT key/cert in `~/.config/` should be mode 600.
 - **SSH:** key-only. Raspberry Pi Imager sets `ssh_pwauth: false`; root has no password or key.
 - **GitHub:** the Pi has no GitHub credentials. It pulls the public repo over HTTPS.
-- To audit: `uv export --frozen --all-groups --no-hashes --no-emit-project -o req.txt && uvx pip-audit -r req.txt --no-deps --disable-pip`. pip-audit evaluates environment markers for the *local* Python, so also audit the Python 3.9-only pins (e.g. pytest 8.4.2) explicitly. For code, run `uvx bandit -r . -x ./.venv,./tests,./htmlcov`.
+- To audit: `uv export --frozen --all-groups --no-hashes --no-emit-project -o req.txt && uvx pip-audit -r req.txt --no-deps --disable-pip`. pip-audit evaluates environment markers for the *local* Python, so if the lock has version-specific pins (two versions of one package), audit the other one explicitly. For code, run `uvx bandit -r . -x ./.venv,./tests,./htmlcov`.
